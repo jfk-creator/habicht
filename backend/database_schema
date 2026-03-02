@@ -1,0 +1,15 @@
+*username, secret, _token, _adress_id, _clients, _invoice, _userinfo
+
+*user_token, expires
+
+*adress_id, address_name, city_code, city_name, street_name, street_number
+
+*client_id, client_name, adress_id, phone, email
+
+*invoice_id, invoice_number, date, _business_adress, _invoice_adress, _greeting, _closer
+
+*position_name, _invoice_id, unit, quantity, price, taxes, description
+
+*greeting_id, greeting
+
+*closer_id, closer
