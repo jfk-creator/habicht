@@ -16,5 +16,16 @@ pub fn main() !void {
 
     var db = try Db.init(); 
     defer db.deinit();
+
+    try db.createTable();
+    const e_mail = "ladiesman217.com";
+
+    const address_id = try db.createAddress("Business", "CA 90265", "Malibu", "Malibu Point", "10880");
+    const user_id = try db.createUser(e_mail, "alslsidjflakjmsdnfkj", address_id, "{some: json}");
+    std.log.info("createdUser: {}", .{user_id});
+    const rc_id = try db.getUserByEmail(e_mail);
+
+    if(rc_id == user_id) std.log.info("success", .{});
+ 
 }
 

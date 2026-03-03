@@ -1,14 +1,14 @@
-*username, secret, _token, _adress_id, _clients, _invoice, _userinfo
+*user_id, usermail, secret, _address_id, userinfo
 
-*user_token, expires
+*token_id, _user_id, user_token, expires
 
-*adress_id, address_name, city_code, city_name, street_name, street_number
+*address_id, address_name, city_code, city_name, street_name, street_number, current
 
-*client_id, client_name, adress_id, phone, email
+*client_id, client_name, _user_id, _address_id, phone, email
 
-*invoice_id, invoice_number, date, _business_adress, _invoice_adress, _greeting, _closer
+*invoice_id, _client_id, _user_id, invoice_number, invoice_date, business_address_snapshot, invoice_address_snapshot, _greeting_id, _closer_id
 
-*position_name, _invoice_id, unit, quantity, price, taxes, description
+*position_id, position_name, _invoice_id, unit, quantity, unit_net_price, tax_percentage, description
 
 *greeting_id, greeting
 
