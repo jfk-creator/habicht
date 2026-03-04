@@ -84,7 +84,6 @@ pub const Db  = struct {
             return error.SQLitePrepareFailed;
         }
         defer _ = sqlite.sqlite3_finalize(stmt);
-
         _= sqlite.sqlite3_bind_text(stmt, 1, address_name, -1, sqlite.SQLITE_STATIC);
         _= sqlite.sqlite3_bind_text(stmt, 2, city_code, -1, sqlite.SQLITE_STATIC);
         _= sqlite.sqlite3_bind_text(stmt, 3, city_name, -1, sqlite.SQLITE_STATIC);
@@ -161,23 +160,23 @@ pub const Db  = struct {
             const secret_ptr = sqlite.sqlite3_column_text(stmt, 1);
 
             std.debug.print("\n--- User Found ---\n", .{});
-            std.debug.print("Email:     {s}\n", .{email});
-            std.debug.print("User ID:   {d}\n", .{user_id});
-            std.debug.print("Secret:    {s}\n", .{secret_ptr});
+            std.debug.print("Email:      {s}\n", .{email});
+            std.debug.print("User ID:    {d}\n", .{user_id});
+            std.debug.print("Secret:     {s}\n", .{secret_ptr});
 
             //Adress can be optional
             if (sqlite.sqlite3_column_type(stmt, 2) != sqlite.SQLITE_NULL) {
                 const address_id = sqlite.sqlite3_column_int64(stmt, 2);
-                std.debug.print("Address ID:{d}\n", .{address_id});
+                std.debug.print("Address ID: {d}\n", .{address_id});
             } else {
-                std.debug.print("Address ID:NULL\n", .{});
+                std.debug.print("Address ID: NULL\n", .{});
             }
 
             if (sqlite.sqlite3_column_type(stmt, 3) != sqlite.SQLITE_NULL) {
                 const info_ptr = sqlite.sqlite3_column_text(stmt, 3);
-                std.debug.print("User Info: {s}\n", .{info_ptr});
+                std.debug.print("User Info:  {s}\n", .{info_ptr});
             } else {
-                std.debug.print("User Info: NULL\n", .{});
+                std.debug.print("User Info:  NULL\n", .{});
             }
             std.debug.print("------------------\n\n", .{});
 
