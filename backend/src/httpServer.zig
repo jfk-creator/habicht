@@ -1,9 +1,9 @@
 const std = @import("std");
 const Db = @import("db.zig").Db;
+const Cypher = @import("cypher.zig");
 
 const net = std.net;
 const http = std.http;
-
 
 const cors_headers = [_]std.http.Header{
     .{ .name = "Access-Control-Allow-Origin", .value = "*" }, 
@@ -75,7 +75,7 @@ pub const HttpServer = struct {
 
     pub fn handlePost(self: *HttpServer, request: *std.http.Server.Request) void {
         const path = request.head.target;
-        if (std.mem.eql(u8, path, "/register")) {
+        if (std.mem.eql(u8, path, "/app/register")) {
             _ = self.handleRegister(request) catch |err| { std.log.err("{}", .{err});};
         }
 
@@ -110,25 +110,43 @@ pub const HttpServer = struct {
         secret: []const u8
     };
 
+    const TokenData = struct {
+        key: []const u8
+    };
+
     pub fn registerUserInDb(self: *HttpServer, loginData: RegisterData, request: *std.http.Server.Request) !void { 
             const email = loginData.email;
-            const secret = loginData.secret;
-
-            const email_z: [:0]const u8 = try self.alloc.dupeZ(u8, email);
-            const secret_z: [:0]const u8 = try self.alloc.dupeZ(u8, secret);
+            var hashBuffer: [255]u8 = undefined;
+            const hash = try Cypher.hashPassword(self.alloc, loginData.secret, &hashBuffer);
 
             const address_id = try self.db.*.createAddress(
                 "Business", "CA 90265", "Malibu", "Malibu Point", "10880");
 
-            if(self.db.createUser(email_z, secret_z, address_id, "{some: json}")) |user_id| {
-                try request.respond("{\"key\": \"SuperSecretKey\"}", .{
+            if(self.db.createUser(email, hash, address_id, "{some: json}")) |_| {
+                const tokenString = try Cypher.createToken(self.alloc);
+                defer self.alloc.free(tokenString);
+
+                const user_id = try self.db.getUserByEmail(email); 
+                if(user_id) |id| {
+                    _ = try self.db.addTokenToUser(id, tokenString);
+                }
+
+                const tokenData: TokenData = .{.key = tokenString};
+
+                //TODO: Would be nice without allocation
+                var jsonData = std.Io.Writer.Allocating.init(self.alloc); 
+                defer jsonData.deinit();
+
+                std.debug.print("!!!!!!sending Token: {s}\n", .{tokenString});
+
+                var s: std.json.Stringify = .{ .writer = &jsonData.writer, .options = .{} };
+                try s.write(tokenData);
+
+                try request.respond(jsonData.written(), .{
                     .status = .ok,
                     .extra_headers = &cors_headers, // only for localhost, nginx is doing this for us
                     .keep_alive = false,
                 });
-                std.log.info("createdUser: {}", .{user_id});
-                const rc_id = try self.db.getUserByEmail(email_z);
-                if(rc_id == user_id) std.log.info("success", .{});
             } else |err| {
                 std.log.err("{}", .{err});
                 try request.respond("{\"err\": \"Email already in use.\"}", .{

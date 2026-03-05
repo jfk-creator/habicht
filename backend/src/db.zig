@@ -56,7 +56,7 @@ pub const Db  = struct {
                 \\  user_id INTEGER NOT NULL, 
                 \\  user_token TEXT UNIQUE NOT NULL, 
                 \\  expires DATETIME, 
-                \\  FOREIGN KEY (user_id) REFERENCES user (user_id) ON DELETE CASCADE );
+                \\  FOREIGN KEY (user_id) REFERENCES users (user_id) ON DELETE CASCADE );
         ;
         const exec_rc = sqlite.sqlite3_exec(self.sqlite3, sql, null, null, &self.err_msg);
         if (exec_rc != sqlite.SQLITE_OK) {
@@ -101,10 +101,10 @@ pub const Db  = struct {
 
     pub fn createUser(
         self: *Db,
-        usermail: [:0]const u8, 
-        secret: [:0]const u8,
+        email: []const u8, 
+        secret: []const u8,
         address_id: ?i64,      
-        userinfo: ?[:0]const u8 
+        userinfo: ?[]const u8 
     ) !i64 {
         const sql = "INSERT INTO users (usermail, secret, address_id, userinfo) VALUES (?, ?, ?, ?)";
         var stmt: ?*sqlite.sqlite3_stmt = null;
@@ -115,8 +115,8 @@ pub const Db  = struct {
         }
         defer _ = sqlite.sqlite3_finalize(stmt);
 
-        _ = sqlite.sqlite3_bind_text(stmt, 1, usermail.ptr, -1, sqlite.SQLITE_STATIC);
-        _ = sqlite.sqlite3_bind_text(stmt, 2, secret.ptr, -1, sqlite.SQLITE_STATIC);
+        _ = sqlite.sqlite3_bind_text(stmt, 1, email.ptr, @intCast(email.len), sqlite.SQLITE_STATIC);
+        _ = sqlite.sqlite3_bind_text(stmt, 2, secret.ptr, @intCast(secret.len), sqlite.SQLITE_STATIC);
 
         if (address_id) |id| {
             _ = sqlite.sqlite3_bind_int64(stmt, 3, id);
@@ -125,7 +125,7 @@ pub const Db  = struct {
         }
 
         if (userinfo) |info| {
-            _ = sqlite.sqlite3_bind_text(stmt, 4, info.ptr, -1, sqlite.SQLITE_STATIC);
+            _ = sqlite.sqlite3_bind_text(stmt, 4, info.ptr, @intCast(info.len), sqlite.SQLITE_STATIC);
         } else {
             _ = sqlite.sqlite3_bind_null(stmt, 4);
         }
@@ -140,7 +140,12 @@ pub const Db  = struct {
     }
 
     /// Fetches a user by email, prints their data, and returns their user_id (or null if not found).
-    pub fn getUserByEmail(self: *Db, email: [:0]const u8) !?i64 {
+    pub fn getUserByEmail(
+        self: *Db,
+        email: []const u8
+        ) !?i64 {
+        // const email_z: [:0]const u8 = try alloc.dupeZ(u8, email);
+        // defer alloc.free(email_z);
         const sql = "SELECT user_id, secret, address_id, userinfo FROM users WHERE usermail = ?";
         var stmt: ?*sqlite.sqlite3_stmt = null;
 
@@ -151,7 +156,7 @@ pub const Db  = struct {
         }
         defer _ = sqlite.sqlite3_finalize(stmt);
 
-        _ = sqlite.sqlite3_bind_text(stmt, 1, email.ptr, -1, sqlite.SQLITE_STATIC);
+        _ = sqlite.sqlite3_bind_text(stmt, 1, email.ptr, @intCast(email.len), sqlite.SQLITE_STATIC);
 
         const rc = sqlite.sqlite3_step(stmt);
 
@@ -190,6 +195,32 @@ pub const Db  = struct {
             std.debug.print("Failed to execute query: {s}\n", .{sqlite.sqlite3_errmsg(self.sqlite3)});
             return error.SQLtieExecutionFailed;
         }
+    }
+
+    pub fn addTokenToUser(
+        self: *Db,
+        user_id: i64,
+        tokenString: []const u8, 
+    ) !i64 {
+        const sql = "INSERT INTO tokens (user_id, user_token, expires) VALUES (?, ?, CURRENT_TIMESTAMP)";
+        var stmt: ?*sqlite.sqlite3_stmt = null;
+
+        if (sqlite.sqlite3_prepare_v2(self.sqlite3, sql, -1, &stmt, null) != sqlite.SQLITE_OK) {
+            std.debug.print("Failed to prepare statement: {s}\n", .{sqlite.sqlite3_errmsg(self.sqlite3)});
+            return error.SQLitePrepareFailed;
+        }
+        defer _ = sqlite.sqlite3_finalize(stmt);
+
+        _ = sqlite.sqlite3_bind_int64(stmt, 1, user_id);
+        _ = sqlite.sqlite3_bind_text(stmt, 2, tokenString.ptr, @intCast(tokenString.len), sqlite.SQLITE_STATIC);
+
+        const rc = sqlite.sqlite3_step(stmt);
+        if (rc != sqlite.SQLITE_DONE) {
+            std.log.err("Failed to insert user: {s}", .{sqlite.sqlite3_errmsg(self.sqlite3)});
+            return error.SQliteExecutionFailed;
+        }
+
+        return sqlite.sqlite3_last_insert_rowid(self.sqlite3);
     }
 
     pub fn getUser(self: *Db) void {

@@ -16,7 +16,7 @@ registerFrom.addEventListener('submit', (event) => {
 
 async function login(data) {
     try {
-        const res = await fetch('http://127.0.0.1:8080/register', {
+        const res = await fetch('http://127.0.0.1:8080/eval/register', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify(data)
