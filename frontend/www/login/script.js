@@ -8,17 +8,13 @@ sendButton.addEventListener("click", (event) => {
         console.log(secretInput.value);
 
         const package = {user: userInput.value, secret: secretInput.value};
-        let count = 0;
-        setInterval(() => {
-            login(package);
-            console.log(count++);    
-        }, 2);
+        login(package);
     }
 });
 
 async function login(data) {
     try {
-        const res = await fetch('http://127.0.0.1:6969', {
+        const res = await fetch('http://127.0.0.1:8080/app/login', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify(data)

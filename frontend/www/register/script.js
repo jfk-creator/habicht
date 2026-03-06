@@ -25,7 +25,12 @@ async function login(data) {
         //if(!res.ok) console.error("Nope");
 
         const respData = await res.json();
-        if(respData.key) consoleTab.innerHTML = respData.key;
+        if(respData.key) {
+            localStorage.setItem('sessionToken', respData.key);
+            const token = localStorage.getItem('sessionToken');
+
+            if(token) window.location.replace("http:127.0.0.1:5173/data/index.html"); 
+    }
         if(respData.err) consoleTab.innerHTML = respData.err;
         console.log(respData);
     } catch (error) {

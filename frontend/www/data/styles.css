@@ -1,11 +1,7 @@
-body, p, a, div, span, ul {
-    margin: 0;
-    padding: 0;
-    text-decoration: none;
-    color: white; 
+body, div, span, p, h1, h2, h3 {
+    margin: 0px;
+    padding: 0px;
 }
-
-
 
 body {
     font-family: Urbanist;
@@ -18,7 +14,6 @@ body {
     justify-content: center;
     background-color: black;
     color: white;
-    text-decoration: none;
 }
 
 input {
