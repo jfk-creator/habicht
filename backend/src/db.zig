@@ -99,6 +99,70 @@ pub const Db  = struct {
         return sqlite.sqlite3_last_insert_rowid(self.sqlite3);
     }
 
+    pub const AddressPackage = struct {
+        address_name: []const u8,
+        city_code: []const u8,
+        city_name: []const u8,
+        street_name: []const u8,
+        street_number: []const u8,
+    };
+
+    fn extractString(alloc: std.mem.Allocator, stmt: ?*sqlite.sqlite3_stmt, col_index: i32) ![]const u8 {
+        const ptr = sqlite.sqlite3_column_text(stmt, col_index);
+
+        if (ptr == null) {
+            return error.SqlNullValue; 
+        }
+
+        const len = @as(usize, @intCast(sqlite.sqlite3_column_bytes(stmt, col_index)));
+        const slice = ptr[0..len];
+
+        return try alloc.dupe(u8, slice); 
+    }
+
+    /// Fetches a user by email, prints their data, and returns their user_id (or null if not found).
+    pub fn getAddressById(
+        self: *Db,
+        alloc: std.mem.Allocator,
+        address_id: i64,  
+        ) !?AddressPackage {
+        const sql =
+            "SELECT address_name, city_code, city_name, street_name, street_number FROM addresses WHERE address_id = ?";
+        var stmt: ?*sqlite.sqlite3_stmt = null;
+
+        if (sqlite.sqlite3_prepare_v2(self.sqlite3, sql, -1, &stmt, null) != sqlite.SQLITE_OK) {
+            std.debug.print("Failed to prepare statement: {s}\n",
+                .{sqlite.sqlite3_errmsg(self.sqlite3)});
+            return error.SQLitePrepareFailed;
+        }
+        defer _ = sqlite.sqlite3_finalize(stmt);
+
+        _ = sqlite.sqlite3_bind_int64(stmt, 1, address_id);
+
+        const rc = sqlite.sqlite3_step(stmt);
+
+        if (rc == sqlite.SQLITE_ROW) {
+            const addressData: AddressPackage = .{
+                .address_name  = try extractString(alloc, stmt, 0), 
+                .city_code     = try extractString(alloc, stmt, 1),
+                .city_name     = try extractString(alloc, stmt, 2),
+                .street_name   = try extractString(alloc, stmt, 3),
+                .street_number = try extractString(alloc, stmt, 4),
+            };
+
+            return addressData;
+
+        } else if (rc == sqlite.SQLITE_DONE) {
+            std.debug.print("No address found for user_id: '{d}'\n", .{address_id});
+            return null;
+
+        } else {
+            std.debug.print("Failed to execute query: {s}\n", .{sqlite.sqlite3_errmsg(self.sqlite3)});
+            return error.SQLtieExecutionFailed;
+        }
+    }
+
+
     pub fn createUser(
         self: *Db,
         email: []const u8, 
@@ -140,12 +204,10 @@ pub const Db  = struct {
     }
 
     /// Fetches a user by email, prints their data, and returns their user_id (or null if not found).
-    pub fn getUserByEmail(
+    pub fn getUserIdByEmail(
         self: *Db,
         email: []const u8
         ) !?i64 {
-        // const email_z: [:0]const u8 = try alloc.dupeZ(u8, email);
-        // defer alloc.free(email_z);
         const sql = "SELECT user_id, secret, address_id, userinfo FROM users WHERE usermail = ?";
         var stmt: ?*sqlite.sqlite3_stmt = null;
 
@@ -197,6 +259,60 @@ pub const Db  = struct {
         }
     }
 
+    pub const UserPackage = struct {
+        user_id: i64,
+        user_mail: []const u8,
+        addressData: ?AddressPackage,
+    };
+
+    /// Fetches a user by email, prints their data, and returns their user_id (or null if not found).
+    pub fn getUserByUserId(
+        self: *Db,
+        user_id: i64,
+        ) !?UserPackage {
+        var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+        const alloc = gpa.allocator();
+        const sql = "SELECT usermail, address_id FROM users WHERE user_id = ?";
+        var stmt: ?*sqlite.sqlite3_stmt = null;
+
+        if (sqlite.sqlite3_prepare_v2(self.sqlite3, sql, -1, &stmt, null) != sqlite.SQLITE_OK) {
+            std.debug.print("Failed to prepare statement: {s}\n",
+                .{sqlite.sqlite3_errmsg(self.sqlite3)});
+            return error.SQLitePrepareFailed;
+        }
+        defer _ = sqlite.sqlite3_finalize(stmt);
+
+        _ = sqlite.sqlite3_bind_int64(stmt, 1, user_id);
+
+        const rc = sqlite.sqlite3_step(stmt);
+
+        if (rc == sqlite.SQLITE_ROW) {
+            var user: UserPackage = undefined;
+            user.user_id = user_id; 
+            user.user_mail = try extractString(alloc, stmt, 0); 
+            
+            if (sqlite.sqlite3_column_type(stmt, 1) != sqlite.SQLITE_NULL) {
+                const address_id = sqlite.sqlite3_column_int64(stmt, 1);
+
+                const addressPackage: ?AddressPackage = try self.getAddressById(alloc, address_id);
+                if(addressPackage) |address| {
+                    user.addressData = address;
+                } 
+            }
+
+            return user;
+
+        } else if (rc == sqlite.SQLITE_DONE) {
+            std.debug.print("No user found with email: '{d}'\n", .{user_id});
+            return null;
+
+        } else {
+            std.debug.print("Failed to execute query: {s}\n", .{sqlite.sqlite3_errmsg(self.sqlite3)});
+            return error.SQLtieExecutionFailed;
+        }
+    }
+
+
     pub fn addTokenToUser(
         self: *Db,
         user_id: i64,
@@ -223,26 +339,40 @@ pub const Db  = struct {
         return sqlite.sqlite3_last_insert_rowid(self.sqlite3);
     }
 
-    pub fn getUser(self: *Db) void {
-        //query data
-        const query = "SELECT Id, Name FROM Users WHERE Id = 1;";
+    /// Fetches a user by session token, prints their data, and returns their user_id (or null if not found).
+    pub fn getUserIdByToken(
+        self: *Db,
+        token: []const u8
+        ) !?i64 {
+        const sql = "SELECT user_id, expires FROM tokens WHERE user_token = ?";
         var stmt: ?*sqlite.sqlite3_stmt = null;
 
-        if(sqlite.sqlite3_prepare_v2(self.sqlite3, query, -1, &stmt, null) 
-            == sqlite.SQLITE_OK) {
+        if (sqlite.sqlite3_prepare_v2(self.sqlite3, sql, -1, &stmt, null) != sqlite.SQLITE_OK) {
+            std.debug.print("Failed to prepare statement: {s}\n",
+                .{sqlite.sqlite3_errmsg(self.sqlite3)});
+            return error.SQLitePrepareFailed;
+        }
+        defer _ = sqlite.sqlite3_finalize(stmt);
 
-            defer _ = sqlite.sqlite3_finalize(stmt);
+        _ = sqlite.sqlite3_bind_text(stmt, 1, token.ptr, @intCast(token.len), sqlite.SQLITE_STATIC);
 
-            while (sqlite.sqlite3_step(stmt) == sqlite.SQLITE_ROW) {
-                const id = sqlite.sqlite3_column_int(stmt, 0);
-                const name_ptr = sqlite.sqlite3_column_text(stmt, 1);
+        const rc = sqlite.sqlite3_step(stmt);
 
-                const name = std.mem.span(name_ptr);
+        if (rc == sqlite.SQLITE_ROW) {
+            const user_id = sqlite.sqlite3_column_int64(stmt, 0);
 
-                std.log.info("User found: ID={d}, Name={s}", .{id, name});
-            }
+            std.debug.print("\n--- User Found ---\n", .{});
+            std.debug.print("User ID:    {d}\n", .{user_id});
+            std.debug.print("------------------\n\n", .{});
 
+            return user_id;
+
+        } else if (rc == sqlite.SQLITE_DONE) {
+            std.debug.print("No user found with email: '{s}'\n", .{token});
+            return null;
+        } else {
+            std.debug.print("Failed to execute query: {s}\n", .{sqlite.sqlite3_errmsg(self.sqlite3)});
+            return error.SQLtieExecutionFailed;
         }
     }
-
 };

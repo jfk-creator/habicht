@@ -78,6 +78,9 @@ pub const HttpServer = struct {
         if (std.mem.eql(u8, path, "/app/register")) {
             _ = self.handleRegister(request) catch |err| { std.log.err("{}", .{err});};
         }
+        if (std.mem.eql(u8, path, "/app/data")) {
+            _ = self.handleData(request) catch |err| { std.log.err("{}", .{err});};
+        }
 
     }
 
@@ -126,7 +129,7 @@ pub const HttpServer = struct {
                 const tokenString = try Cypher.createToken(self.alloc);
                 defer self.alloc.free(tokenString);
 
-                const user_id = try self.db.getUserByEmail(email); 
+                const user_id = try self.db.getUserIdByEmail(email); 
                 if(user_id) |id| {
                     _ = try self.db.addTokenToUser(id, tokenString);
                 }
@@ -188,11 +191,91 @@ pub const HttpServer = struct {
         const parsed = std.json.parseFromSlice(RegisterData, self.alloc, body, .{}) catch |err| {
             std.log.err("Json parsing, with: {}", .{err});
             return err;
-    };
+        };
         defer parsed.deinit();
         const loginData = parsed.value;
 
         try self.registerUserInDb(loginData, request);
+
+    }
+
+    const TokenPackage = struct {
+        token: []const u8,
+    };
+
+    pub fn handleData(self: *HttpServer, request: *http.Server.Request) !void {
+
+        var transfer_buffer: [8192]u8 = undefined;
+        var body_reader = request.server.reader.bodyReader(
+            &transfer_buffer, 
+            .none, 
+            request.head.content_length
+        );
+
+        var body_buffer: [8192]u8 = undefined;
+        var bytes_read: usize = 0;
+        while (true) {
+            const size = try body_reader.readSliceShort(body_buffer[bytes_read..]);
+            if (size == 0) break; 
+
+            bytes_read += size;
+            if (request.head.content_length) |c_len| {
+                if (bytes_read >= c_len) break;
+            }
+
+            if (bytes_read >= body_buffer.len) break; 
+        }
+
+        const body = body_buffer[0..bytes_read];
+
+        std.debug.print("Received POST body: {s}\n", .{body});
+
+        const parsed = std.json.parseFromSlice(TokenPackage, self.alloc, body, .{}) catch |err| {
+            std.log.err("Json parsing, with: {}", .{err});
+            return err;
+        };
+        defer parsed.deinit();
+        const token = parsed.value;
+
+        std.debug.print("token: {s}\n", .{token.token});
+
+        const user_id = try self.db.getUserIdByToken(token.token);
+        if (user_id) |id| {
+            std.debug.print("user_id: {}\n", .{id});
+            const user: ?Db.UserPackage = try self.db.getUserByUserId(id);
+            if(user) |u| {
+                std.log.info("User Found\n#-------------------------#\nuser_id: {d}\nuser_mail: {s}\naddress_name: {s}\nstreet_name: {s}\nstreet_number: {s}\ncity_code: {s} city_name: {s}\n#-------------------------#", 
+                    .{
+                        u.user_id, 
+                        u.user_mail, 
+                        u.addressData.?.address_name,
+                        u.addressData.?.street_name,
+                        u.addressData.?.street_number,
+                        u.addressData.?.city_code,
+                        u.addressData.?.city_name
+                    });
+
+                if(u.addressData) |addressData| {
+                    //TODO: Would be nice without allocation
+                    var jsonData = std.Io.Writer.Allocating.init(self.alloc); 
+                    defer jsonData.deinit();
+
+                    std.debug.print("!!!!!!sending Address\n", .{});
+
+                    var s: std.json.Stringify = .{ .writer = &jsonData.writer, .options = .{} };
+                    try s.write(addressData);
+
+                    try request.respond(jsonData.written(), .{
+                        .status = .ok,
+                        .extra_headers = &cors_headers, // only for localhost, nginx is doing this for us
+                        .keep_alive = false,
+                    });
+                }
+                
+            }
+        } 
+
+
 
     }
 
