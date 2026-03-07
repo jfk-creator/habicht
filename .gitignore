@@ -8,3 +8,5 @@ zig-out/
 
 *.db
 local.db
+
+.vite
