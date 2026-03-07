@@ -4,6 +4,9 @@ pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
+    const sqlite_flags = &[_][]const u8{
+        "-DSQLITE_THREADSAFE=2",
+    };
 
     const exe = b.addExecutable(.{
         .name = "Habicht",
@@ -16,11 +19,9 @@ pub fn build(b: *std.Build) void {
 
     exe.addIncludePath(b.path("cInclude"));
 
-    exe.addCSourceFiles(.{
-        .root = b.path("cInclude"), // The base folder for the files below
-        .files = &[_][]const u8{
-            "sqlite3.c",
-        }
+    exe.addCSourceFile(.{
+        .file = b.path("cInclude/sqlite3.c"),
+        .flags = sqlite_flags,
     });
 
     exe.linkLibC();   exe.addIncludePath(b.path("cInclude"));

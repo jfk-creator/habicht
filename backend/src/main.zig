@@ -5,13 +5,14 @@ const VERSION = "V 0.0.1";
 
 pub fn main() !void {
     std.debug.print("Habicht {s}\n", .{VERSION});
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa = std.heap.GeneralPurposeAllocator(.{ .thread_safe = true }){};
     const alloc = gpa.allocator();
+    defer {if(gpa.deinit() == .leak) std.log.err("We are leaking some memory", .{}); }
 
     var server = try Http.init(alloc, .{ 127, 0, 0, 1}, 8080);
     defer server.deinit();
 
-    try server.acceptRoutine();
+    try server.startThreads();
 
  
 }

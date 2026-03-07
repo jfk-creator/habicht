@@ -13,7 +13,11 @@ pub const Db  = struct {
 
     pub fn init() !Db {
         var sqlite3: ?*sqlite.sqlite3 = null;
-        const open_fd = sqlite.sqlite3_open(FILE_NAME, &sqlite3);
+        const flags =   sqlite.SQLITE_OPEN_NOMUTEX |
+                        sqlite.SQLITE_OPEN_READWRITE |
+                        sqlite.SQLITE_OPEN_CREATE;
+        const open_fd = sqlite.sqlite3_open_v2(FILE_NAME, &sqlite3, flags, null); 
+        // const open_fd = sqlite.sqlite3_open(FILE_NAME, &sqlite3);
         if(open_fd != sqlite.SQLITE_OK) {
             std.log.err("Failed to load file: {s}", .{sqlite.sqlite3_errmsg(sqlite3)});
             return error.FailedToLoadFile; 
@@ -60,15 +64,19 @@ pub const Db  = struct {
         ;
         const exec_rc = sqlite.sqlite3_exec(self.sqlite3, sql, null, null, &self.err_msg);
         if (exec_rc != sqlite.SQLITE_OK) {
-            std.log.err("SQL error: {s}", .{self.err_msg});
-            sqlite.sqlite3_free(self.err_msg);
+            if(self.err_msg != null) {
+                std.log.err("SQL error: {s}", .{self.err_msg});
+                sqlite.sqlite3_free(self.err_msg);
+            } else {
+                std.log.err("No error message provided by SQLite", .{});
+            }
             return error.SQLiteTablesNotCreated; 
         } else {
             std.log.info("Table created", .{});
         }
     }
 
-    pub fn createAddress(
+    pub fn insertAddress(
         self: *Db, 
         address_name: [:0]const u8, 
         city_code: [:0]const u8, 
@@ -360,11 +368,6 @@ pub const Db  = struct {
 
         if (rc == sqlite.SQLITE_ROW) {
             const user_id = sqlite.sqlite3_column_int64(stmt, 0);
-
-            std.debug.print("\n--- User Found ---\n", .{});
-            std.debug.print("User ID:    {d}\n", .{user_id});
-            std.debug.print("------------------\n\n", .{});
-
             return user_id;
 
         } else if (rc == sqlite.SQLITE_DONE) {
