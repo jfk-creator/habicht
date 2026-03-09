@@ -1,0 +1,14 @@
+:root {
+  background-color: #030303;
+
+  font-family: Urbanist;
+  color: #eee;
+}
+
+body {
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
