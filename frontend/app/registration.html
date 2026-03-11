@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Urbanist:ital,wght@0,100..900;1,100..900&display=swap"
+      rel="stylesheet"
+    />
+
+    <link rel="stylesheet" href="style/main.css" />
+    <link rel="stylesheet" href="style/registration.css" />
+
+    <title>Registrierung</title>
+  </head>
+  <body>
+    <h1>Registrierung</h1>
+    <form id="registrationForm" class="wrapper">
+      <div id="error_message"></div>
+      <p>Login:</p>
+      <input
+        id="email"
+        name="email"
+        type="email"
+        placeholder="E-Mail"
+        required
+      />
+      <input
+        id="secret"
+        name="secret"
+        type="password"
+        placeholder="Passwort"
+        required
+      />
+      <p>Adresse:</p>
+      <input
+        id="city_code"
+        name="city_code"
+        autocomplete="postal-code"
+        type="text"
+        placeholder="PLZ"
+        required
+      />
+      <input
+        id="city_name"
+        name="city_name"
+        type="text"
+        placeholder="Stadt"
+        required
+      />
+      <input
+        id="street_name"
+        name="street_name"
+        type="text"
+        placeholder="Straße"
+        required
+      />
+      <input
+        id="street_number"
+        name="street_number"
+        type="text"
+        placeholder="Straßennummer"
+        required
+      />
+      <div class="alignRight">
+        <button id="send" type="submit">Abschicken</button>
+      </div>
+    </form>
+    <script src="js/registration.js"></script>
+  </body>
+</html>

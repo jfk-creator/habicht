@@ -1,0 +1,19 @@
+#registrationForm {
+  margin-top: 100px;
+  padding: 25px;
+
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  &:hover {
+    border: solid 1px grey;
+    border-radius: 15px;
+  }
+}
+
+#error_message {
+  content: "";
+  color: #ad0013;
+  height: 1.2rem;
+  font-size: 1.2rem;
+}

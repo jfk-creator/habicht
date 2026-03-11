@@ -1,0 +1,80 @@
+:root {
+  --background: #121312;
+  --light-bg: #232422;
+  --font: #a67d43;
+  --error: #ad0013;
+}
+
+body,
+p,
+a,
+h1,
+h2,
+h3,
+div,
+span,
+ul {
+  margin: 0;
+  padding: 0;
+  text-decoration: none;
+  color: var(--font);
+}
+
+body {
+  font-family: Urbanist;
+  font-size: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 25px;
+  width: 100vw;
+  height: 100vh;
+  align-items: center;
+  background-color: var(--background);
+  color: var(--font);
+  text-decoration: none;
+}
+
+h1 {
+  margin: 1.5rem;
+}
+
+input {
+  background-color: var(--light-bg);
+  color: white;
+  font-size: 1.2rem;
+  height: 2rem;
+  padding: 15px;
+  border: none;
+  outline: none;
+  border-radius: 15px;
+}
+
+/* turn off spinners on "number" */
+/* Chrome, Safari, Edge, Opera */
+input::-webkit-outer-spin-button,
+input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+/* Firefox */
+input[type="number"] {
+  -moz-appearance: textfield;
+}
+
+button {
+  background-color: var(--font);
+  color: black;
+  width: fit-content;
+  font-size: 1.2rem;
+  padding: 15px;
+  border: none;
+  outline: none;
+  border-radius: 15px;
+}
+
+.alignRight {
+  width: 100%;
+  display: flex;
+  justify-content: right;
+}
