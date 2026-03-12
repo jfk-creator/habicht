@@ -261,7 +261,6 @@ pub const Db = struct {
         defer _ = sqlite.sqlite3_finalize(stmt);
 
         try bindText(alloc, stmt, 1, user_mail);
-        // _ = sqlite.sqlite3_bind_text(stmt, 1, user_mail.ptr, @intCast(user_mail.len), sqlite.SQLITE_STATIC);
         const rc = sqlite.sqlite3_step(stmt);
 
         if (rc == sqlite.SQLITE_ROW) {

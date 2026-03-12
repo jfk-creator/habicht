@@ -191,28 +191,7 @@ pub const HttpServer = struct {
         const address_id = try db.*.insertAddress(self.alloc, "Business", city_code, city_name, street_name, street_number);
 
         if (db.insertUser(email, hash, address_id, "{some: json}")) |_| {
-            const tokenString = try Cypher.createToken(self.alloc);
-
-            const user_id = try db.getUserIdByEmail(email);
-            if (user_id) |id| {
-                _ = try db.addTokenToUser(id, tokenString);
-            }
-
-            const tokenData: TokenPackage = .{ .token = tokenString };
-            defer tokenData.deinit(self.alloc);
-
-            //TODO: Would be nice without allocation
-            var jsonData = std.Io.Writer.Allocating.init(self.alloc);
-            defer jsonData.deinit();
-
-            var s: std.json.Stringify = .{ .writer = &jsonData.writer, .options = .{} };
-            try s.write(tokenData);
-
-            try request.respond(jsonData.written(), .{
-                .status = .ok,
-                .extra_headers = &cors_headers, // only for localhost, nginx is doing this for us
-                .keep_alive = true,
-            });
+            try newToken(self.alloc, db, registerData.email, request);
         } else |err| {
             std.log.err("{}", .{err});
             try request.respond("{\"err\": \"Email already in use.\"}", .{
@@ -281,13 +260,13 @@ pub const HttpServer = struct {
         defer self.alloc.free(hash);
 
         if (Cypher.verifyPassword(self.alloc, loginData.secret, hash)) {
-            try newToken(self.alloc, db, loginData, request);
+            try newToken(self.alloc, db, loginData.email, request);
         }
     }
 
-    fn newToken(alloc: std.mem.Allocator, db: *Db, loginData: LoginPackage, request: *std.http.Server.Request) !void {
+    fn newToken(alloc: std.mem.Allocator, db: *Db, user_mail: []const u8, request: *std.http.Server.Request) !void {
         const tokenString = try Cypher.createToken(alloc);
-        const user_id = try db.getUserIdByEmail(loginData.email);
+        const user_id = try db.getUserIdByEmail(user_mail);
         if (user_id) |u| {
             _ = try db.addTokenToUser(u, tokenString);
 
