@@ -3,6 +3,12 @@ const Db = @import("db.zig").Db;
 const ConnectionPool = @import("connectionPool.zig").ConnectionPool;
 const Cypher = @import("cypher.zig");
 
+const RegistrationPackage = @import("definitions.zig").RegistrationPackage;
+const TokenPackage = @import("definitions.zig").TokenPackage;
+const UserPackage = @import("definitions.zig").UserPackage;
+const AddressPackage = @import("definitions.zig").AddressPackage;
+const LoginPackage = @import("definitions.zig").LoginPackage;
+
 const net = std.net;
 const http = std.http;
 
@@ -20,7 +26,11 @@ pub const HttpServer = struct {
     pool: *ConnectionPool,
     connections: std.ArrayList(net.Server.Connection),
 
-    pub fn init(alloc: std.mem.Allocator, host: [4]u8, port: u16) !*HttpServer {
+    pub fn init(
+        alloc: std.mem.Allocator,
+        host: [4]u8,
+        port: u16,
+    ) !*HttpServer {
         const self: *HttpServer = try alloc.create(HttpServer);
         self.alloc = alloc;
         self.addr = net.Address.initIp4(host, port);
@@ -81,7 +91,10 @@ pub const HttpServer = struct {
         std.log.info("Shutting down server.", .{});
     }
 
-    pub fn router(self: *HttpServer, connection: std.net.Server.Connection) void {
+    pub fn router(
+        self: *HttpServer,
+        connection: std.net.Server.Connection,
+    ) void {
         defer connection.stream.close();
 
         std.log.info("connection accepted", .{});
@@ -109,7 +122,9 @@ pub const HttpServer = struct {
         }
     }
 
-    pub fn handleNotImplementedMethods(request: *std.http.Server.Request) void {
+    pub fn handleNotImplementedMethods(
+        request: *std.http.Server.Request,
+    ) void {
         request.respond("Method not implemented.", .{
             .status = .bad_request,
             .extra_headers = &cors_headers, // only for localhost, nginx is doing this for us
@@ -119,21 +134,32 @@ pub const HttpServer = struct {
         };
     }
 
-    pub fn handlePost(self: *HttpServer, request: *std.http.Server.Request) void {
+    pub fn handlePost(
+        self: *HttpServer,
+        request: *std.http.Server.Request,
+    ) void {
         const path = request.head.target;
-        if (std.mem.eql(u8, path, "/app/register")) {
+        if (std.mem.eql(u8, path, "/api/register")) {
             _ = self.handleRegister(request) catch |err| {
                 std.log.err("{}", .{err});
             };
         }
-        if (std.mem.eql(u8, path, "/app/data")) {
+        if (std.mem.eql(u8, path, "/api/login")) {
+            _ = self.handleLogin(request) catch |err| {
+                std.log.err("{}", .{err});
+            };
+        }
+        if (std.mem.eql(u8, path, "/api/data")) {
             _ = self.handleData(request) catch |err| {
                 std.log.err("{}", .{err});
             };
         }
     }
 
-    pub fn sendCORS(request: *std.http.Server.Request, connection: std.net.Server.Connection) void {
+    pub fn sendCORS(
+        request: *std.http.Server.Request,
+        connection: std.net.Server.Connection,
+    ) void {
         request.respond("", .{
             .status = .no_content,
             .extra_headers = &cors_headers, // only for localhost, nginx is doing this for us
@@ -142,19 +168,12 @@ pub const HttpServer = struct {
             std.log.err("responding to {f} errored: {}, [.OPTIONS]", .{ connection.address, err });
         };
     }
-    //get's it's own file?
-    const RegisterData = struct {
-        email: []const u8,
-        secret: []const u8,
-        city_code: []const u8,
-        city_name: []const u8,
-        street_name: []const u8,
-        street_number: []const u8,
-    };
 
-    const TokenData = struct { key: []const u8 };
-
-    pub fn registerUserInDb(self: *HttpServer, registerData: RegisterData, request: *std.http.Server.Request) !void {
+    pub fn registerUserInDb(
+        self: *HttpServer,
+        registerData: RegistrationPackage,
+        request: *std.http.Server.Request,
+    ) !void {
         const email = registerData.email;
         var hashBuffer: [255]u8 = undefined;
         const hash = try Cypher.hashPassword(self.alloc, registerData.secret, &hashBuffer);
@@ -171,16 +190,16 @@ pub const HttpServer = struct {
 
         const address_id = try db.*.insertAddress(self.alloc, "Business", city_code, city_name, street_name, street_number);
 
-        if (db.createUser(email, hash, address_id, "{some: json}")) |_| {
+        if (db.insertUser(email, hash, address_id, "{some: json}")) |_| {
             const tokenString = try Cypher.createToken(self.alloc);
-            defer self.alloc.free(tokenString);
 
             const user_id = try db.getUserIdByEmail(email);
             if (user_id) |id| {
                 _ = try db.addTokenToUser(id, tokenString);
             }
 
-            const tokenData: TokenData = .{ .key = tokenString };
+            const tokenData: TokenPackage = .{ .token = tokenString };
+            defer tokenData.deinit(self.alloc);
 
             //TODO: Would be nice without allocation
             var jsonData = std.Io.Writer.Allocating.init(self.alloc);
@@ -205,11 +224,10 @@ pub const HttpServer = struct {
         }
     }
 
-    pub fn handleRegister(self: *HttpServer, request: *http.Server.Request) !void {
+    fn extractBody(request: *http.Server.Request, body_buffer: []u8) ![]const u8 {
         var transfer_buffer: [8192]u8 = undefined;
         var body_reader = request.server.reader.bodyReader(&transfer_buffer, .none, request.head.content_length);
 
-        var body_buffer: [8192]u8 = undefined;
         var bytes_read: usize = 0;
         while (true) {
             const size = try body_reader.readSliceShort(body_buffer[bytes_read..]);
@@ -223,11 +241,16 @@ pub const HttpServer = struct {
             if (bytes_read >= body_buffer.len) break;
         }
 
-        const body = body_buffer[0..bytes_read];
+        return body_buffer[0..bytes_read];
+    }
+
+    pub fn handleRegister(self: *HttpServer, request: *http.Server.Request) !void {
+        var body_buffer: [8192]u8 = undefined;
+        const body = try extractBody(request, &body_buffer);
 
         std.log.info("Received POST body: {s}", .{body});
 
-        const parsed = std.json.parseFromSlice(RegisterData, self.alloc, body, .{}) catch |err| {
+        const parsed = std.json.parseFromSlice(RegistrationPackage, self.alloc, body, .{}) catch |err| {
             std.log.err("Json parsing, with: {}", .{err});
             return err;
         };
@@ -237,29 +260,58 @@ pub const HttpServer = struct {
         try self.registerUserInDb(registerData, request);
     }
 
-    const TokenPackage = struct {
-        token: []const u8,
-    };
+    pub fn handleLogin(self: *HttpServer, request: *http.Server.Request) !void {
+        var body_buffer: [8192]u8 = undefined;
+        const body = try extractBody(request, &body_buffer);
+        std.log.info("Received POST body: {s}", .{body});
+
+        const parsed = std.json.parseFromSlice(LoginPackage, self.alloc, body, .{}) catch |err| {
+            std.log.err("Json parsing, with: {}", .{err});
+            return err;
+        };
+        defer parsed.deinit();
+        const loginData: LoginPackage = parsed.value;
+
+        var db = try self.pool.acquire();
+        defer self.pool.release(db) catch |err| {
+            std.log.err("{}", .{err});
+        };
+
+        const hash = try db.getHashFromMail(self.alloc, loginData.email);
+        defer self.alloc.free(hash);
+
+        if (Cypher.verifyPassword(self.alloc, loginData.secret, hash)) {
+            try newToken(self.alloc, db, loginData, request);
+        }
+    }
+
+    fn newToken(alloc: std.mem.Allocator, db: *Db, loginData: LoginPackage, request: *std.http.Server.Request) !void {
+        const tokenString = try Cypher.createToken(alloc);
+        const user_id = try db.getUserIdByEmail(loginData.email);
+        if (user_id) |u| {
+            _ = try db.addTokenToUser(u, tokenString);
+
+            const tokenData: TokenPackage = .{ .token = tokenString };
+            defer tokenData.deinit(alloc);
+
+            //TODO: Would be nice without allocation
+            var jsonData = std.Io.Writer.Allocating.init(alloc);
+            defer jsonData.deinit();
+
+            var s: std.json.Stringify = .{ .writer = &jsonData.writer, .options = .{} };
+            try s.write(tokenData);
+
+            try request.respond(jsonData.written(), .{
+                .status = .ok,
+                .extra_headers = &cors_headers, // only for localhost, nginx is doing this for us
+                .keep_alive = true,
+            });
+        }
+    }
 
     pub fn handleData(self: *HttpServer, request: *http.Server.Request) !void {
-        var transfer_buffer: [8192]u8 = undefined;
-        var body_reader = request.server.reader.bodyReader(&transfer_buffer, .none, request.head.content_length);
-
         var body_buffer: [8192]u8 = undefined;
-        var bytes_read: usize = 0;
-        while (true) {
-            const size = try body_reader.readSliceShort(body_buffer[bytes_read..]);
-            if (size == 0) break;
-
-            bytes_read += size;
-            if (request.head.content_length) |c_len| {
-                if (bytes_read >= c_len) break;
-            }
-
-            if (bytes_read >= body_buffer.len) break;
-        }
-
-        const body = body_buffer[0..bytes_read];
+        const body = try extractBody(request, &body_buffer);
 
         std.log.info("Received POST body: {s}", .{body});
 
@@ -277,17 +329,20 @@ pub const HttpServer = struct {
 
         const user_id = try db.getUserIdByToken(token.token);
         if (user_id) |id| {
-            const user: ?Db.UserPackage = try db.getUserByUserId(self.alloc, id);
+            const user: ?UserPackage = try db.getUserByUserId(self.alloc, id);
+            defer user.?.deinit(self.alloc);
             if (user) |u| {
-                std.log.info("User Found\n-----------------------------------\nuser_id: \t{d}\nuser_mail: \t{s}\naddress_name: \t{s}\nstreet_name: \t{s}\nstreet_number: \t{s}\ncity_code: \t{s}\ncity_name: \t{s}\n-----------------------------------", .{ u.user_id, u.user_mail, u.addressData.?.address_name, u.addressData.?.street_name, u.addressData.?.street_number, u.addressData.?.city_code, u.addressData.?.city_name });
+                const addr: ?AddressPackage = try db.getAddressById(self.alloc, u.address_id);
+                defer addr.?.deinit(self.alloc);
+                if (addr) |a| {
+                    std.log.info("User Found\n-----------------------------------\nuser_id: \t{d}\nuser_mail: \t{s}\naddress_name: \t{s}\nstreet_name: \t{s}\nstreet_number: \t{s}\ncity_code: \t{s}\ncity_name: \t{s}\n-----------------------------------", .{ u.user_id, u.user_mail, a.address_name, a.street_name, a.street_number, a.city_code, a.city_name });
 
-                if (u.addressData) |addressData| {
                     //TODO: Would be nice without allocation
                     var jsonData = std.Io.Writer.Allocating.init(self.alloc);
                     defer jsonData.deinit();
 
                     var s: std.json.Stringify = .{ .writer = &jsonData.writer, .options = .{} };
-                    try s.write(addressData);
+                    try s.write(a);
 
                     try request.respond(jsonData.written(), .{
                         .status = .ok,

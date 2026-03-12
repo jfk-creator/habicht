@@ -1,4 +1,6 @@
 const std = @import("std");
+const UserPackage = @import("definitions.zig").UserPackage;
+const AddressPackage = @import("definitions.zig").AddressPackage;
 const sqlite = @cImport({
     @cInclude("sqlite3.h");
 });
@@ -92,16 +94,11 @@ pub const Db = struct {
             return error.SQLitePrepareFailed;
         }
         defer _ = sqlite.sqlite3_finalize(stmt);
-        // _ = sqlite.sqlite3_bind_text(stmt, 1, address_name, -1, sqlite.SQLITE_STATIC);
         try bindText(alloc, stmt, 1, address_name);
         try bindText(alloc, stmt, 2, city_code);
         try bindText(alloc, stmt, 3, city_name);
         try bindText(alloc, stmt, 4, street_name);
         try bindText(alloc, stmt, 5, street_number);
-        // _ = sqlite.sqlite3_bind_text(stmt, 2, city_code, -1, sqlite.SQLITE_STATIC);
-        // _ = sqlite.sqlite3_bind_text(stmt, 3, city_name, -1, sqlite.SQLITE_STATIC);
-        // _ = sqlite.sqlite3_bind_text(stmt, 4, street_name, -1, sqlite.SQLITE_STATIC);
-        // _ = sqlite.sqlite3_bind_text(stmt, 5, street_number, -1, sqlite.SQLITE_STATIC);
 
         const rc = sqlite.sqlite3_step(stmt);
         if (rc != sqlite.SQLITE_DONE) {
@@ -112,17 +109,15 @@ pub const Db = struct {
         return sqlite.sqlite3_last_insert_rowid(self.sqlite3);
     }
 
-    pub const AddressPackage = struct {
-        address_name: []const u8,
-        city_code: []const u8,
-        city_name: []const u8,
-        street_name: []const u8,
-        street_number: []const u8,
-    };
-
-    fn bindText(alloc: std.mem.Allocator, stmt: ?*sqlite.sqlite3_stmt, step: c_int, field: []const u8) !void {
+    fn bindText(
+        alloc: std.mem.Allocator,
+        stmt: ?*sqlite.sqlite3_stmt,
+        step: c_int,
+        field: []const u8,
+    ) !void {
         const field_z = try alloc.dupeZ(u8, field);
-        _ = sqlite.sqlite3_bind_text(stmt, step, field_z, @as(c_int, @intCast(field.len)), sqlite.SQLITE_STATIC);
+        defer alloc.free(field_z);
+        _ = sqlite.sqlite3_bind_text(stmt, step, field_z, @as(c_int, @intCast(field.len)), sqlite.SQLITE_TRANSIENT);
     }
 
     fn extractString(alloc: std.mem.Allocator, stmt: ?*sqlite.sqlite3_stmt, col_index: i32) ![]const u8 {
@@ -148,10 +143,7 @@ pub const Db = struct {
             "SELECT address_name, city_code, city_name, street_name, street_number FROM addresses WHERE address_id = ?";
         var stmt: ?*sqlite.sqlite3_stmt = null;
 
-        if (sqlite.sqlite3_prepare_v2(self.sqlite3, sql, -1, &stmt, null) != sqlite.SQLITE_OK) {
-            std.debug.print("Failed to prepare statement: {s}\n", .{sqlite.sqlite3_errmsg(self.sqlite3)});
-            return error.SQLitePrepareFailed;
-        }
+        try prepareStatment(self.sqlite3, sql, &stmt);
         defer _ = sqlite.sqlite3_finalize(stmt);
 
         _ = sqlite.sqlite3_bind_int64(stmt, 1, address_id);
@@ -177,14 +169,17 @@ pub const Db = struct {
         }
     }
 
-    pub fn createUser(self: *Db, email: []const u8, secret: []const u8, address_id: ?i64, userinfo: ?[]const u8) !i64 {
+    pub fn insertUser(
+        self: *Db,
+        email: []const u8,
+        secret: []const u8,
+        address_id: ?i64,
+        userinfo: ?[]const u8,
+    ) !i64 {
         const sql = "INSERT INTO users (usermail, secret, address_id, userinfo) VALUES (?, ?, ?, ?)";
         var stmt: ?*sqlite.sqlite3_stmt = null;
 
-        if (sqlite.sqlite3_prepare_v2(self.sqlite3, sql, -1, &stmt, null) != sqlite.SQLITE_OK) {
-            std.debug.print("Failed to prepare statement: {s}\n", .{sqlite.sqlite3_errmsg(self.sqlite3)});
-            return error.SQLitePrepareFailed;
-        }
+        try prepareStatment(self.sqlite3, sql, &stmt);
         defer _ = sqlite.sqlite3_finalize(stmt);
 
         _ = sqlite.sqlite3_bind_text(stmt, 1, email.ptr, @intCast(email.len), sqlite.SQLITE_STATIC);
@@ -216,10 +211,7 @@ pub const Db = struct {
         const sql = "SELECT user_id, secret, address_id, userinfo FROM users WHERE usermail = ?";
         var stmt: ?*sqlite.sqlite3_stmt = null;
 
-        if (sqlite.sqlite3_prepare_v2(self.sqlite3, sql, -1, &stmt, null) != sqlite.SQLITE_OK) {
-            std.debug.print("Failed to prepare statement: {s}\n", .{sqlite.sqlite3_errmsg(self.sqlite3)});
-            return error.SQLitePrepareFailed;
-        }
+        try prepareStatment(self.sqlite3, sql, &stmt);
         defer _ = sqlite.sqlite3_finalize(stmt);
 
         _ = sqlite.sqlite3_bind_text(stmt, 1, email.ptr, @intCast(email.len), sqlite.SQLITE_STATIC);
@@ -261,11 +253,29 @@ pub const Db = struct {
         }
     }
 
-    pub const UserPackage = struct {
-        user_id: i64,
-        user_mail: []const u8,
-        addressData: ?AddressPackage,
-    };
+    pub fn getHashFromMail(self: *Db, alloc: std.mem.Allocator, user_mail: []const u8) ![]const u8 {
+        const sql = "SELECT secret FROM users WHERE usermail = ?";
+        var stmt: ?*sqlite.sqlite3_stmt = null;
+
+        try prepareStatment(self.sqlite3, sql, &stmt);
+        defer _ = sqlite.sqlite3_finalize(stmt);
+
+        try bindText(alloc, stmt, 1, user_mail);
+        // _ = sqlite.sqlite3_bind_text(stmt, 1, user_mail.ptr, @intCast(user_mail.len), sqlite.SQLITE_STATIC);
+        const rc = sqlite.sqlite3_step(stmt);
+
+        if (rc == sqlite.SQLITE_ROW) {
+            const hash = try extractString(alloc, stmt, 0);
+            std.log.info("===============> your hash: {s}", .{hash});
+            return hash;
+        } else if (rc == sqlite.SQLITE_DONE) {
+            std.log.err("User with mail: {s} not found", .{user_mail});
+            return error.UserNotFound;
+        } else {
+            std.log.err("Sqlite faild to get data.", .{});
+            return error.SQLiteExecutionFailed;
+        }
+    }
 
     /// Fetches a user by email, prints their data, and returns their user_id (or null if not found).
     pub fn getUserByUserId(
@@ -276,10 +286,7 @@ pub const Db = struct {
         const sql = "SELECT usermail, address_id FROM users WHERE user_id = ?";
         var stmt: ?*sqlite.sqlite3_stmt = null;
 
-        if (sqlite.sqlite3_prepare_v2(self.sqlite3, sql, -1, &stmt, null) != sqlite.SQLITE_OK) {
-            std.debug.print("Failed to prepare statement: {s}\n", .{sqlite.sqlite3_errmsg(self.sqlite3)});
-            return error.SQLitePrepareFailed;
-        }
+        try prepareStatment(self.sqlite3, sql, &stmt);
         defer _ = sqlite.sqlite3_finalize(stmt);
 
         _ = sqlite.sqlite3_bind_int64(stmt, 1, user_id);
@@ -291,14 +298,8 @@ pub const Db = struct {
             user.user_id = user_id;
             user.user_mail = try extractString(alloc, stmt, 0);
 
-            if (sqlite.sqlite3_column_type(stmt, 1) != sqlite.SQLITE_NULL) {
-                const address_id = sqlite.sqlite3_column_int64(stmt, 1);
-
-                const addressPackage: ?AddressPackage = try self.getAddressById(alloc, address_id);
-                if (addressPackage) |address| {
-                    user.addressData = address;
-                }
-            }
+            const address_id = sqlite.sqlite3_column_int64(stmt, 1);
+            user.address_id = address_id;
 
             return user;
         } else if (rc == sqlite.SQLITE_DONE) {
@@ -306,7 +307,7 @@ pub const Db = struct {
             return null;
         } else {
             std.debug.print("Failed to execute query: {s}\n", .{sqlite.sqlite3_errmsg(self.sqlite3)});
-            return error.SQLtieExecutionFailed;
+            return error.SQLiteExecutionFailed;
         }
     }
 
@@ -318,10 +319,7 @@ pub const Db = struct {
         const sql = "INSERT INTO tokens (user_id, user_token, expires) VALUES (?, ?, CURRENT_TIMESTAMP)";
         var stmt: ?*sqlite.sqlite3_stmt = null;
 
-        if (sqlite.sqlite3_prepare_v2(self.sqlite3, sql, -1, &stmt, null) != sqlite.SQLITE_OK) {
-            std.debug.print("Failed to prepare statement: {s}\n", .{sqlite.sqlite3_errmsg(self.sqlite3)});
-            return error.SQLitePrepareFailed;
-        }
+        try prepareStatment(self.sqlite3, sql, &stmt);
         defer _ = sqlite.sqlite3_finalize(stmt);
 
         _ = sqlite.sqlite3_bind_int64(stmt, 1, user_id);
@@ -336,15 +334,19 @@ pub const Db = struct {
         return sqlite.sqlite3_last_insert_rowid(self.sqlite3);
     }
 
+    fn prepareStatment(sqlite3: ?*sqlite.sqlite3, sql: [*c]const u8, stmt: [*c]?*sqlite.sqlite3_stmt) !void {
+        if (sqlite.sqlite3_prepare_v2(sqlite3, sql, -1, stmt, null) != sqlite.SQLITE_OK) {
+            std.debug.print("Failed to prepare statement: {s}\n", .{sqlite.sqlite3_errmsg(sqlite3)});
+            return error.SQLitePrepareFailed;
+        }
+    }
+
     /// Fetches a user by session token, prints their data, and returns their user_id (or null if not found).
     pub fn getUserIdByToken(self: *Db, token: []const u8) !?i64 {
         const sql = "SELECT user_id, expires FROM tokens WHERE user_token = ?";
         var stmt: ?*sqlite.sqlite3_stmt = null;
 
-        if (sqlite.sqlite3_prepare_v2(self.sqlite3, sql, -1, &stmt, null) != sqlite.SQLITE_OK) {
-            std.debug.print("Failed to prepare statement: {s}\n", .{sqlite.sqlite3_errmsg(self.sqlite3)});
-            return error.SQLitePrepareFailed;
-        }
+        try prepareStatment(self.sqlite3, sql, &stmt);
         defer _ = sqlite.sqlite3_finalize(stmt);
 
         _ = sqlite.sqlite3_bind_text(stmt, 1, token.ptr, @intCast(token.len), sqlite.SQLITE_STATIC);
