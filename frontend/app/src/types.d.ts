@@ -7,3 +7,8 @@ interface registration_t {
   street_name: string;
   street_number: string;
 }
+
+interface LoginPackage {
+  email: string;
+  secret: string;
+}

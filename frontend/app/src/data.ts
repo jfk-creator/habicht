@@ -43,9 +43,9 @@ async function getData(sendToken) {
   const package = { token: sendToken };
   console.log("sending: ", package);
   try {
-    const res = await fetch("http://127.0.0.1:8080/app/data", {
+    const res = await fetch("http://127.0.0.1:8080/api/data", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      eeaders: { "Content-Type": "application/json" },
       body: JSON.stringify(package),
     });
 
