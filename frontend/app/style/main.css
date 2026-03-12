@@ -38,6 +38,10 @@ h1 {
   margin: 1.5rem;
 }
 
+a {
+  text-decoration: underline;
+}
+
 input {
   background-color: var(--light-bg);
   color: white;
@@ -77,4 +81,15 @@ button {
   width: 100%;
   display: flex;
   justify-content: right;
+}
+
+.mainForm {
+  margin-top: 100px;
+  padding: 25px;
+
+  max-width: 450px;
+
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
 }

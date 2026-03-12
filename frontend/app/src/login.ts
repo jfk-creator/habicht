@@ -1,31 +1,28 @@
-import { Logger } from "./utils";
+import { APIADDR, Logger } from "./utils";
 
-const userInput = document.getElementById("user") as HTMLInputElement;
-const secretInput = document.getElementById("secret") as HTMLInputElement;
-const sendButton = document.getElementById("send");
+const loginForm = document.getElementById("loginForm");
 
 const logger = new Logger();
 
-if (!sendButton) logger.err("sendButton not found!");
-if (!userInput) logger.err("userInput not found!");
+if (!loginForm) logger.err("loginForm not found!");
 
-sendButton!.addEventListener("click", (event) => {
-  //TODO: Make it a form
-  if (userInput!.value && secretInput!.value) {
-    console.log(userInput!.value);
-    console.log(secretInput!.value);
+loginForm!.addEventListener("submit", (event) => {
+  event.preventDefault();
 
-    const loginPackage: LoginPackage = {
-      email: userInput!.value,
-      secret: secretInput!.value,
-    };
-    login(loginPackage);
+  if (!event.target) {
+    logger.err("no event.target found!");
+    return;
   }
+  const formData = new FormData(event.target as HTMLFormElement);
+  const rawData = Object.fromEntries(formData.entries());
+  const data = rawData as unknown as LoginPackage;
+  logger.info(data);
+  login(data);
 });
 
 async function login(data: LoginPackage) {
   try {
-    const res = await fetch("http://127.0.0.1:8080/api/login", {
+    const res = await fetch(APIADDR + "/api/login", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data),
@@ -46,7 +43,7 @@ async function login(data: LoginPackage) {
 
       // await sleep(50000);
 
-      if (token) window.location.replace("http://127.0.0.1:5173/data.html");
+      if (token) window.location.href = "data.html";
     }
   } catch (error) {
     console.error("Fetch failed:", error);

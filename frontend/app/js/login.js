@@ -1,4 +1,6 @@
 // src/utils.ts
+var APIADDR = "http://127.0.0.1:8080";
+
 class Logger {
   info(msg) {
     console.log("INFO: %s", msg);
@@ -9,28 +11,25 @@ class Logger {
 }
 
 // src/login.ts
-var userInput = document.getElementById("user");
-var secretInput = document.getElementById("secret");
-var sendButton = document.getElementById("send");
+var loginForm = document.getElementById("loginForm");
 var logger = new Logger;
-if (!sendButton)
-  logger.err("sendButton not found!");
-if (!userInput)
-  logger.err("userInput not found!");
-sendButton.addEventListener("click", (event) => {
-  if (userInput.value && secretInput.value) {
-    console.log(userInput.value);
-    console.log(secretInput.value);
-    const loginPackage = {
-      email: userInput.value,
-      secret: secretInput.value
-    };
-    login(loginPackage);
+if (!loginForm)
+  logger.err("loginForm not found!");
+loginForm.addEventListener("submit", (event) => {
+  event.preventDefault();
+  if (!event.target) {
+    logger.err("no event.target found!");
+    return;
   }
+  const formData = new FormData(event.target);
+  const rawData = Object.fromEntries(formData.entries());
+  const data = rawData;
+  logger.info(data);
+  login(data);
 });
 async function login(data) {
   try {
-    const res = await fetch("http://127.0.0.1:8080/api/login", {
+    const res = await fetch(APIADDR + "/api/login", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data)
@@ -47,7 +46,7 @@ async function login(data) {
       localStorage.setItem("sessionToken", respData.token);
       const token = localStorage.getItem("sessionToken");
       if (token)
-        window.location.replace("http://127.0.0.1:5173/data.html");
+        window.location.href = "data.html";
     }
   } catch (error) {
     console.error("Fetch failed:", error);

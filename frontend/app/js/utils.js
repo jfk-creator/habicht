@@ -1,4 +1,6 @@
 // src/utils.ts
+var APIADDR = "http://127.0.0.1:8080";
+
 class Logger {
   info(msg) {
     console.log("INFO: %s", msg);
@@ -8,5 +10,6 @@ class Logger {
   }
 }
 export {
-  Logger
+  Logger,
+  APIADDR
 };

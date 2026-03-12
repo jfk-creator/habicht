@@ -11,15 +11,22 @@
     />
 
     <link rel="stylesheet" href="style/main.css" />
+    <link rel="stylesheet" href="style/login.css" />
     <title>Login</title>
   </head>
   <body>
     <h1>Login</h1>
-    <div class="wrapper">
-      <input id="user" type="text" placeholder="User Name" />
-      <input id="secret" type="password" placeholder="Password" />
-    </div>
-    <button id="send">Send</button>
+    <form id="loginForm" class="mainForm">
+      <p>
+        Du hast noch keinen Account? Du kannst dich
+        <a href="./registration.html">hier</a> registrieren.
+      </p>
+      <input id="user" name="email" type="email" placeholder="E-Mail" />
+      <input id="secret" name="secret" type="password" placeholder="Password" />
+      <div class="alignRight">
+        <button id="send" type="submit">Send</button>
+      </div>
+    </form>
     <script src="js/login.js"></script>
   </body>
 </html>

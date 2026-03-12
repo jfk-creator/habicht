@@ -1,3 +1,5 @@
+export const APIADDR: string = "http://127.0.0.1:8080";
+
 export class Logger {
   info(msg: any) {
     console.log("INFO: %s", msg);

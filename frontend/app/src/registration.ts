@@ -1,4 +1,5 @@
-import { Logger } from "./utils.ts";
+import { Logger, APIADDR } from "./utils.ts";
+
 const logger = new Logger();
 
 logger.info("register init");
@@ -9,7 +10,7 @@ const errorMsg = document.getElementById("error_message");
 if (!registerForm) logger.err("registerForm not found");
 if (!errorMsg) logger.err("errorMsg not found");
 
-registerForm!.addEventListener("submit", (event) => {
+secretregisterForm!.addEventListener("submit", (event) => {
   event.preventDefault();
 
   if (!event.target) {
@@ -27,7 +28,7 @@ const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 async function registerUser(data: registration_t) {
   try {
-    const res = await fetch("http://127.0.0.1:8080/api/register", {
+    const res = await fetch(APIADDR + "/api/register", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data),
@@ -50,7 +51,7 @@ async function registerUser(data: registration_t) {
 
       // await sleep(50000);
 
-      if (token) window.location.replace("http://127.0.0.1:5173/data.html");
+      if (token) window.location.href = "/data.html";
     }
     if (respData.err) errorMsg!.innerText = respData.err;
     console.log(respData);

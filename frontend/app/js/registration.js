@@ -1,4 +1,6 @@
 // src/utils.ts
+var APIADDR = "http://127.0.0.1:8080";
+
 class Logger {
   info(msg) {
     console.log("INFO: %s", msg);
@@ -31,7 +33,7 @@ registerForm.addEventListener("submit", (event) => {
 });
 async function registerUser(data) {
   try {
-    const res = await fetch("http://127.0.0.1:8080/api/register", {
+    const res = await fetch(APIADDR + "/api/register", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data)
@@ -50,7 +52,7 @@ async function registerUser(data) {
       localStorage.setItem("sessionToken", respData.token);
       const token = localStorage.getItem("sessionToken");
       if (token)
-        window.location.replace("http://127.0.0.1:5173/data.html");
+        window.location.href = "/data.html";
     }
     if (respData.err)
       errorMsg.innerText = respData.err;

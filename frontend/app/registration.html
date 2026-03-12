@@ -17,7 +17,7 @@
   </head>
   <body>
     <h1>Registrierung</h1>
-    <form id="registrationForm" class="wrapper">
+    <form id="registrationForm" class="mainForm">
       <div id="error_message"></div>
       <p>Login:</p>
       <input
@@ -25,12 +25,14 @@
         name="email"
         type="email"
         placeholder="E-Mail"
+        autocomplete="email"
         required
       />
       <input
         id="secret"
         name="secret"
         type="password"
+        autocomplete="new-password"
         placeholder="Passwort"
         required
       />

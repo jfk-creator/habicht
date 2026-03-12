@@ -1,33 +1,29 @@
+import { Logger } from "./utils";
+
 const userMessage = document.getElementById("status");
 const street_name = document.getElementById("street_name");
 const street_number = document.getElementById("street_number");
 const city_code = document.getElementById("city_code");
 const city_name = document.getElementById("city_name");
 
+const logger = new Logger();
+
 function main() {
   const sessionToken = checkToken();
-  if (!sessionToken) {
-    console.warn("sessionToken not found: ", sessionToken);
-    // window.location.replace("http://127.0.0.1:5173/login/index.html");
-  }
-  console.log("sessionToken: ", sessionToken);
+  logger.info("token: " + sessionToken);
   getData(sessionToken);
 }
 
 main();
 
-function checkToken() {
+function checkToken(): string | null {
   const token = localStorage.getItem("sessionToken");
-  if (!token) return;
+  if (!token) {
+    logger.err("No sessionToken provided.");
+    window.location.replace("http://127.0.0.1:5173/login.html");
+  }
   return token;
 }
-
-const AdressData = {
-  street_name: "Street Name",
-  street_number: "98765",
-  city_code: "98765",
-  city_name: "City Name",
-};
 
 function fillAdress(data) {
   if (!data) console.error("No data provided");
@@ -45,7 +41,7 @@ async function getData(sendToken) {
   try {
     const res = await fetch("http://127.0.0.1:8080/api/data", {
       method: "POST",
-      eeaders: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(package),
     });
 

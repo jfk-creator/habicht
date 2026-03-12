@@ -1,14 +1,5 @@
 #registrationForm {
-  margin-top: 100px;
-  padding: 25px;
-
-  display: flex;
-  flex-direction: column;
-  gap: 15px;
-  &:hover {
-    border: solid 1px grey;
-    border-radius: 15px;
-  }
+  width: 100%;
 }
 
 #error_message {
