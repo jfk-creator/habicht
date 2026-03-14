@@ -51,10 +51,12 @@ pub const Db = struct {
             \\  current INTEGER DEFAULT 1); 
             \\CREATE TABLE IF NOT EXISTS users (
             \\  user_id INTEGER PRIMARY KEY, 
-            \\  usermail TEXT UNIQUE NOT NULL, 
+            \\  first_name TEXT NOT NULL, 
+            \\  last_name TEXT NOT NULL, 
+            \\  email TEXT UNIQUE NOT NULL, 
             \\  secret TEXT NOT NULL, 
             \\  address_id INTEGER, 
-            \\  userinfo TEXT, 
+            \\  info TEXT, 
             \\  FOREIGN KEY (address_id) REFERENCES addresses (address_id) );
             \\CREATE TABLE IF NOT EXISTS tokens (  
             \\  token_id INTEGER PRIMARY KEY, 
@@ -173,28 +175,33 @@ pub const Db = struct {
         self: *Db,
         email: []const u8,
         secret: []const u8,
+        first_name: []const u8,
+        last_name: []const u8,
         address_id: ?i64,
-        userinfo: ?[]const u8,
+        info: ?[]const u8,
     ) !i64 {
-        const sql = "INSERT INTO users (usermail, secret, address_id, userinfo) VALUES (?, ?, ?, ?)";
+        const sql = "INSERT INTO users (email, secret, first_name, last_name, address_id,  info) VALUES (?, ?, ?, ?, ?, ?)";
         var stmt: ?*sqlite.sqlite3_stmt = null;
 
         try prepareStatment(self.sqlite3, sql, &stmt);
         defer _ = sqlite.sqlite3_finalize(stmt);
 
+        std.debug.print("first_name: {s}\n", .{first_name});
         _ = sqlite.sqlite3_bind_text(stmt, 1, email.ptr, @intCast(email.len), sqlite.SQLITE_STATIC);
         _ = sqlite.sqlite3_bind_text(stmt, 2, secret.ptr, @intCast(secret.len), sqlite.SQLITE_STATIC);
+        _ = sqlite.sqlite3_bind_text(stmt, 3, first_name.ptr, @intCast(first_name.len), sqlite.SQLITE_STATIC);
+        _ = sqlite.sqlite3_bind_text(stmt, 4, last_name.ptr, @intCast(last_name.len), sqlite.SQLITE_STATIC);
 
         if (address_id) |id| {
-            _ = sqlite.sqlite3_bind_int64(stmt, 3, id);
+            _ = sqlite.sqlite3_bind_int64(stmt, 5, id);
         } else {
-            _ = sqlite.sqlite3_bind_null(stmt, 3);
+            _ = sqlite.sqlite3_bind_null(stmt, 5);
         }
 
-        if (userinfo) |info| {
-            _ = sqlite.sqlite3_bind_text(stmt, 4, info.ptr, @intCast(info.len), sqlite.SQLITE_STATIC);
+        if (info) |i| {
+            _ = sqlite.sqlite3_bind_text(stmt, 6, i.ptr, @intCast(i.len), sqlite.SQLITE_STATIC);
         } else {
-            _ = sqlite.sqlite3_bind_null(stmt, 4);
+            _ = sqlite.sqlite3_bind_null(stmt, 6);
         }
 
         const rc = sqlite.sqlite3_step(stmt);
@@ -208,7 +215,7 @@ pub const Db = struct {
 
     /// Fetches a user by email, prints their data, and returns their user_id (or null if not found).
     pub fn getUserIdByEmail(self: *Db, email: []const u8) !?i64 {
-        const sql = "SELECT user_id, secret, address_id, userinfo FROM users WHERE usermail = ?";
+        const sql = "SELECT user_id, secret, address_id, info FROM users WHERE email = ?";
         var stmt: ?*sqlite.sqlite3_stmt = null;
 
         try prepareStatment(self.sqlite3, sql, &stmt);
@@ -254,7 +261,7 @@ pub const Db = struct {
     }
 
     pub fn getHashFromMail(self: *Db, alloc: std.mem.Allocator, user_mail: []const u8) ![]const u8 {
-        const sql = "SELECT secret FROM users WHERE usermail = ?";
+        const sql = "SELECT secret FROM users WHERE email = ?";
         var stmt: ?*sqlite.sqlite3_stmt = null;
 
         try prepareStatment(self.sqlite3, sql, &stmt);
@@ -282,7 +289,7 @@ pub const Db = struct {
         alloc: std.mem.Allocator,
         user_id: i64,
     ) !?UserPackage {
-        const sql = "SELECT usermail, address_id FROM users WHERE user_id = ?";
+        const sql = "SELECT email, first_name, last_name, address_id FROM users WHERE user_id = ?";
         var stmt: ?*sqlite.sqlite3_stmt = null;
 
         try prepareStatment(self.sqlite3, sql, &stmt);
@@ -295,9 +302,11 @@ pub const Db = struct {
         if (rc == sqlite.SQLITE_ROW) {
             var user: UserPackage = undefined;
             user.user_id = user_id;
-            user.user_mail = try extractString(alloc, stmt, 0);
+            user.email = try extractString(alloc, stmt, 0);
+            user.first_name = try extractString(alloc, stmt, 1);
+            user.last_name = try extractString(alloc, stmt, 2);
 
-            const address_id = sqlite.sqlite3_column_int64(stmt, 1);
+            const address_id = sqlite.sqlite3_column_int64(stmt, 3);
             user.address_id = address_id;
 
             return user;

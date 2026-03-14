@@ -175,6 +175,8 @@ pub const HttpServer = struct {
         request: *std.http.Server.Request,
     ) !void {
         const email = registerData.email;
+        const first_name = registerData.first_name;
+        const last_name = registerData.last_name;
         var hashBuffer: [255]u8 = undefined;
         const hash = try Cypher.hashPassword(self.alloc, registerData.secret, &hashBuffer);
 
@@ -190,7 +192,7 @@ pub const HttpServer = struct {
 
         const address_id = try db.*.insertAddress(self.alloc, "Business", city_code, city_name, street_name, street_number);
 
-        if (db.insertUser(email, hash, address_id, "{some: json}")) |_| {
+        if (db.insertUser(email, hash, first_name, last_name, address_id, "{some: json}")) |_| {
             try newToken(self.alloc, db, registerData.email, request);
         } else |err| {
             std.log.err("{}", .{err});
@@ -314,14 +316,24 @@ pub const HttpServer = struct {
                 const addr: ?AddressPackage = try db.getAddressById(self.alloc, u.address_id);
                 defer addr.?.deinit(self.alloc);
                 if (addr) |a| {
-                    std.log.info("User Found\n-----------------------------------\nuser_id: \t{d}\nuser_mail: \t{s}\naddress_name: \t{s}\nstreet_name: \t{s}\nstreet_number: \t{s}\ncity_code: \t{s}\ncity_name: \t{s}\n-----------------------------------", .{ u.user_id, u.user_mail, a.address_name, a.street_name, a.street_number, a.city_code, a.city_name });
+                    std.log.info("User Found\n-----------------------------------\nuser_id: \t{d}\nuser_mail: \t{s}\naddress_name: \t{s}\nstreet_name: \t{s}\nstreet_number: \t{s}\ncity_code: \t{s}\ncity_name: \t{s}\n-----------------------------------", .{ u.user_id, u.email, a.address_name, a.street_name, a.street_number, a.city_code, a.city_name });
+
+                    const UserAndAddress = struct {
+                        user: UserPackage,
+                        address: AddressPackage,
+                    };
+
+                    //TODO Something is Wrong here
+                    const userAndAddress: UserAndAddress = .{ .user = u, .address = a };
+
+                    std.debug.print("UserAddres: {}", .{userAndAddress});
 
                     //TODO: Would be nice without allocation
                     var jsonData = std.Io.Writer.Allocating.init(self.alloc);
                     defer jsonData.deinit();
 
                     var s: std.json.Stringify = .{ .writer = &jsonData.writer, .options = .{} };
-                    try s.write(a);
+                    try s.write(userAndAddress);
 
                     try request.respond(jsonData.written(), .{
                         .status = .ok,
