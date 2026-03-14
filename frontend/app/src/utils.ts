@@ -1,4 +1,7 @@
 export const APIADDR: string = "http://127.0.0.1:8080";
+export const SERVERADDR: string = "http://127.0.0.1:4040";
+export const WORKSPACE_INDEX: string =
+  "http://127.0.0.1:4040/workspace/index.html";
 
 export class Logger {
   info(msg: any) {
@@ -6,6 +9,6 @@ export class Logger {
   }
 
   err(msg: string) {
-    console.log("\x1b[31mERROR: %s \x1b[0m", msg);
+    console.error("ERROR: %s", msg);
   }
 }

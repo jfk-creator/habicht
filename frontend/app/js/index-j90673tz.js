@@ -1,4 +1,4 @@
-// src/utils.ts
+// js/workspace_index.js
 class Logger {
   info(msg) {
     console.log("INFO: %s", msg);
@@ -7,20 +7,29 @@ class Logger {
     console.log("\x1B[31mERROR: %s \x1B[0m", msg);
   }
 }
-
-// src/data.ts
-var userMessage = document.getElementById("status");
+var logger = new Logger;
+var user_name = document.getElementById("user_name");
 var street_name = document.getElementById("street_name");
 var street_number = document.getElementById("street_number");
 var city_code = document.getElementById("city_code");
 var city_name = document.getElementById("city_name");
-var logger = new Logger;
 function main() {
+  console.log("init workspace");
   const sessionToken = checkToken();
   logger.info("token: " + sessionToken);
   getData(sessionToken);
 }
-main();
+if (user_name && street_name && street_number && city_code && city_name) {
+  main();
+} else {
+  logger.err(`missing element:
+` + `
+user_name: ` + user_name + `
+street_name:` + street_name + `
+street_number: ` + street_number + `
+city_code: ` + city_code + `
+city_name ` + city_name);
+}
 function checkToken() {
   const token = localStorage.getItem("sessionToken");
   if (!token) {
@@ -28,14 +37,6 @@ function checkToken() {
     window.location.replace("http://127.0.0.1:5173/login.html");
   }
   return token;
-}
-function fillAdress(data) {
-  if (!data)
-    console.error("No data provided");
-  street_name.innerText = data.street_name;
-  street_number.innerText = data.street_number;
-  city_code.innerText = data.city_code;
-  city_name.innerText = data.city_name;
 }
 async function getData(sendToken) {
   const incomingData = { token: sendToken };
@@ -51,9 +52,17 @@ async function getData(sendToken) {
       console.error(respData.err);
     console.log(respData);
     fillAdress(respData.address);
-    userMessage.innerText = "Logged in";
-    userMessage.style.color = "green";
+    if (user_name)
+      user_name.innerText = "respData.user.first_name";
   } catch (error) {
     console.error("Fetch failed:", error);
   }
+}
+function fillAdress(data) {
+  if (!data)
+    console.error("No data provided");
+  street_name.innerText = data.street_name;
+  street_number.innerText = data.street_number;
+  city_code.innerText = data.city_code;
+  city_name.innerText = data.city_name;
 }

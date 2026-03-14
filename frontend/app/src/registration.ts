@@ -1,4 +1,5 @@
-import { Logger, APIADDR } from "./utils.ts";
+import { Logger, APIADDR, WORKSPACE_INDEX } from "./utils.ts";
+import { registration_t } from "./types";
 
 const logger = new Logger();
 
@@ -10,7 +11,7 @@ const errorMsg = document.getElementById("error_message");
 if (!registerForm) logger.err("registerForm not found");
 if (!errorMsg) logger.err("errorMsg not found");
 
-secretregisterForm!.addEventListener("submit", (event) => {
+registerForm!.addEventListener("submit", (event) => {
   event.preventDefault();
 
   if (!event.target) {
@@ -51,7 +52,7 @@ async function registerUser(data: registration_t) {
 
       // await sleep(50000);
 
-      if (token) window.location.href = "/data.html";
+      if (token) window.location.href = WORKSPACE_INDEX;
     }
     if (respData.err) errorMsg!.innerText = respData.err;
     console.log(respData);

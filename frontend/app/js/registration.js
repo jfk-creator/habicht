@@ -1,5 +1,6 @@
 // src/utils.ts
 var APIADDR = "http://127.0.0.1:8080";
+var WORKSPACE_INDEX = "http://127.0.0.1:4040/workspace/index.html";
 
 class Logger {
   info(msg) {
@@ -52,7 +53,7 @@ async function registerUser(data) {
       localStorage.setItem("sessionToken", respData.token);
       const token = localStorage.getItem("sessionToken");
       if (token)
-        window.location.href = "/data.html";
+        window.location.href = WORKSPACE_INDEX;
     }
     if (respData.err)
       errorMsg.innerText = respData.err;

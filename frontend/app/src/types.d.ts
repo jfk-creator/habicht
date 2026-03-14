@@ -1,4 +1,4 @@
-interface registration_t {
+export interface registration_t {
   email: string;
   secret: string;
   address_name: string;

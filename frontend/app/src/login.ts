@@ -1,4 +1,4 @@
-import { APIADDR, Logger } from "./utils";
+import { APIADDR, Logger, WORKSPACE_INDEX } from "./utils";
 
 const loginForm = document.getElementById("loginForm");
 
@@ -43,7 +43,7 @@ async function login(data: LoginPackage) {
 
       // await sleep(50000);
 
-      if (token) window.location.href = "data.html";
+      if (token) window.location.href = WORKSPACE_INDEX;
     }
   } catch (error) {
     console.error("Fetch failed:", error);

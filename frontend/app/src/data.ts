@@ -27,31 +27,29 @@ function checkToken(): string | null {
 
 function fillAdress(data) {
   if (!data) console.error("No data provided");
-  street_name.innerText = data.street_name;
-  street_number.innerText = data.street_number;
-  city_code.innerText = data.city_code;
-  city_name.innerText = data.city_name;
+  street_name!.innerText = data.street_name;
+  street_number!.innerText = data.street_number;
+  city_code!.innerText = data.city_code;
+  city_name!.innerText = data.city_name;
 }
 
-fillAdress(AdressData);
-
 async function getData(sendToken) {
-  const package = { token: sendToken };
-  console.log("sending: ", package);
+  const incomingData = { token: sendToken };
+  console.log("sending: ", incomingData);
   try {
     const res = await fetch("http://127.0.0.1:8080/api/data", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(package),
+      body: JSON.stringify(incomingData),
     });
 
     const respData = await res.json();
     if (!res.ok) console.error(respData.err);
 
     console.log(respData);
-    fillAdress(respData);
-    userMessage.innerText = "Logged in";
-    userMessage.style.color = "green";
+    fillAdress(respData.address);
+    userMessage!.innerText = "Logged in";
+    userMessage!.style.color = "green";
   } catch (error) {
     console.error("Fetch failed:", error);
   }
